@@ -5,204 +5,230 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#6366f1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>FI Forecast</title>
   <link rel="manifest" href="./manifest.json" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f23; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
-    input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; background: #2a2a4a; border-radius: 3px; outline: none; }
-    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #6366f1; cursor: pointer; }
-    input[type="number"] { -moz-appearance: textfield; }
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    ::-webkit-scrollbar { height: 4px; width: 4px; }
-    ::-webkit-scrollbar-track { background: #0f0f23; }
-    ::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 4px; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0f0f23;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+    input[type="range"]{-webkit-appearance:none;appearance:none;height:6px;background:#2a2a4a;border-radius:3px;outline:none}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#6366f1;cursor:pointer}
+    input[type="number"]{-moz-appearance:textfield}
+    input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+    ::-webkit-scrollbar{height:4px;width:4px}::-webkit-scrollbar-track{background:#0f0f23}::-webkit-scrollbar-thumb{background:#3a3a5c;border-radius:4px}
+    #loading{color:#9ca3af;font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:60px 20px;font-size:14px}
+    #loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid #2a2a4a;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #error-display{display:none;color:#ef4444;font-family:'IBM Plex Mono',monospace;padding:40px 20px;font-size:12px;max-width:600px;margin:0 auto}
+    #error-display h2{color:#f8fafc;font-size:16px;margin-bottom:12px}
+    #error-display pre{background:#1a1a2e;padding:16px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
   </style>
 </head>
 <body>
-  <div id="root"></div>
-
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
-
+  <div id="root"><div id="loading"><div class="spinner"></div><div>Loading Financial Independence Forecast...</div></div></div>
+  <div id="error-display"><h2>Something went wrong</h2><pre id="error-message"></pre><p style="color:#9ca3af;margin-top:12px">Try refreshing. If persists, check internet connection.</p></div>
+  <script>window.onerror=function(m,u,l,c){document.getElementById('loading').style.display='none';var e=document.getElementById('error-display');e.style.display='block';document.getElementById('error-message').textContent=m+'\nFile: '+(u||'')+'\nLine: '+l+':'+c;}</script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.9/babel.min.js" crossorigin></script>
+  <script>
+    var missing=[];
+    if(typeof React==='undefined')missing.push('React');
+    if(typeof ReactDOM==='undefined')missing.push('ReactDOM');
+    if(typeof Recharts==='undefined')missing.push('Recharts');
+    if(typeof Babel==='undefined')missing.push('Babel');
+    if(missing.length){document.getElementById('loading').style.display='none';var ed=document.getElementById('error-display');ed.style.display='block';document.getElementById('error-message').textContent='Failed to load: '+missing.join(', ')+'\nCDN may be blocked. Try refreshing.';}
+  </script>
   <script type="text/babel">
-    const { useState, useMemo, useCallback } = React;
-    const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart, CartesianGrid, Legend, BarChart, Bar } = Recharts;
+    var defined = React;
+    var useState = defined.useState;
+    var useMemo = defined.useMemo;
+    var useCallback = defined.useCallback;
+    var Fragment = defined.Fragment;
+    var RC = Recharts;
 
-    const SECTION_STYLE = {
-      background: "#1a1a2e",
-      borderRadius: 12,
-      padding: "20px 24px",
-      marginBottom: 16,
-      border: "1px solid #2a2a4a",
+    var SECTION_STYLE = { background: "#1a1a2e", borderRadius: 12, padding: "20px 24px", marginBottom: 16, border: "1px solid #2a2a4a" };
+    var LABEL_STYLE = { color: "#9ca3af", fontSize: 12, fontWeight: 500, marginBottom: 4, display: "block", letterSpacing: "0.02em" };
+    var INPUT_STYLE = { background: "#0f0f23", border: "1px solid #3a3a5c", borderRadius: 8, color: "#e2e8f0", padding: "8px 12px", width: "100%", fontSize: 14, boxSizing: "border-box", outline: "none" };
+    var GRID = function(cols) { return { display: "grid", gridTemplateColumns: "repeat("+cols+", 1fr)", gap: 12 }; };
+
+    var fmt = function(n) {
+      if (Math.abs(n) >= 1e6) return "$"+(n/1e6).toFixed(2)+"M";
+      if (Math.abs(n) >= 1e3) return "$"+(n/1e3).toFixed(0)+"k";
+      return "$"+n.toFixed(0);
     };
+    var fmtFull = function(n) { return "$"+n.toLocaleString("en-US",{maximumFractionDigits:0}); };
 
-    const LABEL_STYLE = {
-      color: "#9ca3af",
-      fontSize: 12,
-      fontWeight: 500,
-      marginBottom: 4,
-      display: "block",
-      letterSpacing: "0.02em",
-    };
-
-    const INPUT_STYLE = {
-      background: "#0f0f23",
-      border: "1px solid #3a3a5c",
-      borderRadius: 8,
-      color: "#e2e8f0",
-      padding: "8px 12px",
-      width: "100%",
-      fontSize: 14,
-      boxSizing: "border-box",
-      outline: "none",
-    };
-
-    const GRID = (cols) => ({
-      display: "grid",
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-      gap: 12,
-    });
-
-    const fmt = (n) => {
-      if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-      if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(0)}k`;
-      return `$${n.toFixed(0)}`;
-    };
-
-    const fmtFull = (n) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-
-    const Slider = ({ label, value, onChange, min, max, step, format, tooltip }) => (
-      <div style={{ marginBottom: 2 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <label style={LABEL_STYLE}>{label}</label>
-          <span style={{ color: "#f8fafc", fontSize: 14, fontWeight: 600, fontFeatureSettings: "'tnum'" }}>
-            {format ? format(value) : value}
-          </span>
+    var Slider = function(props) {
+      return (<div style={{marginBottom:2}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+          <label style={LABEL_STYLE}>{props.label}</label>
+          <span style={{color:"#f8fafc",fontSize:14,fontWeight:600,fontFeatureSettings:"'tnum'"}}>{props.format ? props.format(props.value) : props.value}</span>
         </div>
-        {tooltip && <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 4 }}>{tooltip}</div>}
-        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ width: "100%", accentColor: "#6366f1", cursor: "pointer" }} />
-      </div>
-    );
-
-    const NumberInput = ({ label, value, onChange, tooltip, prefix = "$" }) => (
-      <div>
-        <label style={LABEL_STYLE}>{label}</label>
-        {tooltip && <div style={{ color: "#6b7280", fontSize: 10, marginBottom: 2 }}>{tooltip}</div>}
-        <div style={{ position: "relative" }}>
-          {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#6b7280", fontSize: 14 }}>{prefix}</span>}
-          <input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ ...INPUT_STYLE, paddingLeft: prefix ? 24 : 12 }} />
-        </div>
-      </div>
-    );
-
-    const Badge = ({ children, color = "#6366f1" }) => (
-      <span style={{ background: `${color}22`, color, padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em" }}>{children}</span>
-    );
-
-    const TABS = ["Assumptions", "Projections", "Spending", "Risks"];
-
-    const defaultAssumptions = {
-      currentAge: 35, retirementAge: 35, endAge: 95,
-      startingPortfolio: 4200000, annualSpending: 120000,
-      inflationRate: 3.0, nominalReturn: 7.0, volatility: 12.0, cashBufferYears: 3,
-      healthcareBaseAnnual: 24000, healthcareInflation: 5.5, healthcareOOPMax: 16000,
-      medicareAge: 65, medicareCostAnnual: 8000,
-      homeValue: 650000, propertyTaxRate: 1.0, homeInsurance: 3500, maintenanceRate: 1.0,
-      carValue: 50000, carReplacementYears: 10, carAnnualCosts: 6000,
-      kid1Age: 3, kid2Age: 1, collegeStartAge: 18, collegeYears: 4,
-      annualCollegeCost: 35000, collegeCostInflation: 4.5,
-      childAnnualCost: 15000, childIndependenceAge: 18,
-      ssStartAge: 67, ssMonthlyBenefit: 2500,
-      partTimeIncome: 0, partTimeEndAge: 45, rentalIncome: 0,
-      effectiveTaxRate: 0, capitalGainsTaxRate: 0,
-      groceries: 1400, utilities: 400, phoneInternet: 250,
-      transportation: 500, personalCare: 200, clothing: 300,
+        {props.tooltip ? <div style={{color:"#6b7280",fontSize:11,marginBottom:4}}>{props.tooltip}</div> : null}
+        <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={function(e){props.onChange(Number(e.target.value));}} style={{width:"100%",accentColor:"#6366f1",cursor:"pointer"}} />
+      </div>);
     };
 
-    // Load/save state to localStorage
-    function loadState() {
-      try {
-        const saved = localStorage.getItem('fi-forecast-state');
-        if (saved) return { ...defaultAssumptions, ...JSON.parse(saved) };
-      } catch (e) {}
-      return defaultAssumptions;
-    }
-    function saveState(state) {
-      try { localStorage.setItem('fi-forecast-state', JSON.stringify(state)); } catch (e) {}
-    }
+    var NumberInput = function(props) {
+      var prefix = props.prefix !== undefined ? props.prefix : "$";
+      return (<div>
+        <label style={LABEL_STYLE}>{props.label}</label>
+        {props.tooltip ? <div style={{color:"#6b7280",fontSize:10,marginBottom:2}}>{props.tooltip}</div> : null}
+        <div style={{position:"relative"}}>
+          {prefix ? <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#6b7280",fontSize:14}}>{prefix}</span> : null}
+          <input type="number" value={props.value} onChange={function(e){props.onChange(Number(e.target.value));}} style={Object.assign({},INPUT_STYLE,{paddingLeft:prefix?24:12})} />
+        </div>
+      </div>);
+    };
+
+    var Badge = function(props) {
+      var color = props.color || "#6366f1";
+      return <span style={{background:color+"22",color:color,padding:"3px 10px",borderRadius:6,fontSize:11,fontWeight:600,letterSpacing:"0.03em"}}>{props.children}</span>;
+    };
+
+    var TABS = ["Assumptions","Projections","Spending","Risks"];
+
+    var defaultAssumptions = {
+      currentAge:35,retirementAge:35,endAge:95,startingPortfolio:4200000,annualSpending:120000,
+      inflationRate:3.0,nominalReturn:7.0,volatility:12.0,cashBufferYears:3,
+      healthcareBaseAnnual:24000,healthcareInflation:5.5,healthcareOOPMax:16000,medicareAge:65,medicareCostAnnual:8000,
+      homeValue:650000,propertyTaxRate:1.0,homeInsurance:3500,maintenanceRate:1.0,
+      carValue:50000,carReplacementYears:10,carAnnualCosts:6000,
+      kid1Age:3,kid2Age:1,collegeStartAge:18,collegeYears:4,annualCollegeCost:35000,collegeCostInflation:4.5,
+      childAnnualCost:15000,childIndependenceAge:18,
+      ssStartAge:67,ssMonthlyBenefit:2500,partTimeIncome:0,partTimeEndAge:45,rentalIncome:0,
+      effectiveTaxRate:0,capitalGainsTaxRate:0,
+      groceries:1400,utilities:400,phoneInternet:250,transportation:500,personalCare:200,clothing:300
+    };
+
+    function loadState(){try{var s=localStorage.getItem('fi-forecast-state');if(s)return Object.assign({},defaultAssumptions,JSON.parse(s));}catch(e){}return defaultAssumptions;}
+    function saveState(s){try{localStorage.setItem('fi-forecast-state',JSON.stringify(s));}catch(e){}}
 
     function runProjection(a) {
-      const years = [];
-      let portfolio = a.startingPortfolio;
-      let depleted = false;
-      let depletionAge = null;
-
-      for (let age = a.currentAge; age <= a.endAge; age++) {
-        const year = age - a.currentAge;
-        const cumulativeInflation = Math.pow(1 + a.inflationRate / 100, year);
-
-        let healthcare;
-        if (age < a.medicareAge) {
-          healthcare = a.healthcareBaseAnnual * Math.pow(1 + a.healthcareInflation / 100, year);
-        } else {
-          healthcare = a.medicareCostAnnual * Math.pow(1 + a.healthcareInflation / 100, year - (a.medicareAge - a.currentAge));
+      var years=[],portfolio=a.startingPortfolio,depleted=false,depletionAge=null;
+      for(var age=a.currentAge;age<=a.endAge;age++){
+        var year=age-a.currentAge;
+        var ci=Math.pow(1+a.inflationRate/100,year);
+        var hc=age<a.medicareAge?a.healthcareBaseAnnual*Math.pow(1+a.healthcareInflation/100,year):a.medicareCostAnnual*Math.pow(1+a.healthcareInflation/100,year-(a.medicareAge-a.currentAge));
+        var hv=a.homeValue*Math.pow(1+a.inflationRate/100,year);
+        var ht=hv*(a.propertyTaxRate/100)+a.homeInsurance*ci+hv*(a.maintenanceRate/100);
+        var ca=a.carAnnualCosts*ci;
+        var cr=(year>0&&year%a.carReplacementYears===0)?a.carValue*ci:0;
+        var cc=0;
+        if(a.kid1Age+year<a.childIndependenceAge)cc+=a.childAnnualCost*ci;
+        if(a.kid2Age+year<a.childIndependenceAge)cc+=a.childAnnualCost*ci;
+        var col=0,k1s=a.collegeStartAge-a.kid1Age+a.currentAge,k2s=a.collegeStartAge-a.kid2Age+a.currentAge;
+        for(var cy=0;cy<a.collegeYears;cy++){
+          if(age===k1s+cy)col+=a.annualCollegeCost*Math.pow(1+a.collegeCostInflation/100,(k1s-a.currentAge)+cy);
+          if(age===k2s+cy)col+=a.annualCollegeCost*Math.pow(1+a.collegeCostInflation/100,(k2s-a.currentAge)+cy);
         }
+        var le=(a.groceries+a.utilities+a.phoneInternet+a.transportation+a.personalCare+a.clothing)*12*ci;
+        var es=hc+ht+ca+cr+cc+col+le;
+        var ts=a.annualSpending*ci;
+        var disc=Math.max(0,ts-es);
+        var tw=es+disc;
+        var inc=0;
+        if(age>=a.ssStartAge)inc+=a.ssMonthlyBenefit*12*Math.pow(1+a.inflationRate/100,age-a.ssStartAge);
+        if(age<a.partTimeEndAge)inc+=a.partTimeIncome*ci;
+        inc+=a.rentalIncome*ci;
+        var tax=Math.max(0,tw-inc)*(a.effectiveTaxRate/100);
+        var nw=Math.max(0,tw+tax-inc);
+        var gr=portfolio*(a.nominalReturn/100);
+        portfolio=portfolio+gr-nw;
+        if(portfolio<=0&&!depleted){depleted=true;depletionAge=age;}
+        if(portfolio<0)portfolio=0;
+        var wr=(portfolio+nw)>0?(nw/(portfolio+nw))*100:100;
+        years.push({age:age,portfolio:Math.round(portfolio),portfolioPlusHome:Math.round(portfolio+hv),healthcare:Math.round(hc),housingTotal:Math.round(ht),carAnnual:Math.round(ca+cr),childCosts:Math.round(cc),collegeCosts:Math.round(col),livingEssentials:Math.round(le),discretionary:Math.round(disc),totalWithdrawal:Math.round(tw),income:Math.round(inc),netWithdrawal:Math.round(nw),withdrawalRate:Math.round(wr*100)/100,currentHomeValue:Math.round(hv)});
+      }
+      return {years:years,depleted:depleted,depletionAge:depletionAge};
+    }
 
-        const homeAppreciation = Math.pow(1 + a.inflationRate / 100, year);
-        const currentHomeValue = a.homeValue * homeAppreciation;
-        const propertyTax = currentHomeValue * (a.propertyTaxRate / 100);
-        const homeInsurance = a.homeInsurance * cumulativeInflation;
-        const homeMaintenance = currentHomeValue * (a.maintenanceRate / 100);
-        const housingTotal = propertyTax + homeInsurance + homeMaintenance;
+    var CustomTooltip = function(p) {
+      if(!p.active||!p.payload||!p.payload.length)return null;
+      return (<div style={{background:"#1a1a2e",border:"1px solid #3a3a5c",borderRadius:8,padding:"10px 14px",fontSize:12}}>
+        <div style={{color:"#9ca3af",marginBottom:6,fontWeight:600}}>Age {p.label}</div>
+        {p.payload.map(function(pp,i){return <div key={i} style={{color:pp.color,marginBottom:2,display:"flex",justifyContent:"space-between",gap:16}}>
+          <span>{pp.name}</span><span style={{fontWeight:600,fontFeatureSettings:"'tnum'"}}>{pp.name.indexOf("Rate")>=0?pp.value+"%":fmtFull(pp.value)}</span>
+        </div>;})}
+      </div>);
+    };
 
-        const carAnnual = a.carAnnualCosts * cumulativeInflation;
-        const isCarReplacementYear = year > 0 && year % a.carReplacementYears === 0;
-        const carReplacement = isCarReplacementYear ? a.carValue * cumulativeInflation : 0;
+    function App() {
+      var tabState = useState(0); var tab = tabState[0]; var setTab = tabState[1];
+      var aState = useState(loadState); var a = aState[0]; var setA = aState[1];
+      var set = useCallback(function(key){return function(val){setA(function(prev){var n=Object.assign({},prev);n[key]=val;saveState(n);return n;});};}, []);
+      var apply = useCallback(function(ch){setA(function(prev){var n=Object.assign({},prev,ch);saveState(n);return n;});}, []);
 
-        const kid1CurrentAge = a.kid1Age + year;
-        const kid2CurrentAge = a.kid2Age + year;
-        let childCosts = 0;
-        if (kid1CurrentAge < a.childIndependenceAge) childCosts += a.childAnnualCost * cumulativeInflation;
-        if (kid2CurrentAge < a.childIndependenceAge) childCosts += a.childAnnualCost * cumulativeInflation;
+      var result = useMemo(function(){return runProjection(a);}, [a]);
+      var years=result.years,depleted=result.depleted,depletionAge=result.depletionAge;
+      var fp=years[years.length-1]?years[years.length-1].portfolio:0;
+      var pw=Math.max.apply(null,years.map(function(y){return y.withdrawalRate;}));
+      var y0=years[0];
+      var pct=function(v){return v+"%";};
 
-        let collegeCosts = 0;
-        const collegeInflation = (age2Start, currentYear) => {
-          const yearsToCollege = age2Start - a.currentAge;
-          return a.annualCollegeCost * Math.pow(1 + a.collegeCostInflation / 100, yearsToCollege + (currentYear - yearsToCollege));
-        };
-        const kid1CollegeStart = a.collegeStartAge - a.kid1Age + a.currentAge;
-        const kid2CollegeStart = a.collegeStartAge - a.kid2Age + a.currentAge;
-        for (let cy = 0; cy < a.collegeYears; cy++) {
-          if (age === kid1CollegeStart + cy) collegeCosts += collegeInflation(kid1CollegeStart, year);
-          if (age === kid2CollegeStart + cy) collegeCosts += collegeInflation(kid2CollegeStart, year);
-        }
+      return (<div style={{fontFamily:"'IBM Plex Sans',-apple-system,sans-serif",background:"#0f0f23",color:"#e2e8f0",minHeight:"100vh",padding:"24px 16px",paddingBottom:80}}>
+        <div style={{maxWidth:1000,margin:"0 auto",marginBottom:24}}>
+          <h1 style={{fontSize:22,fontWeight:700,color:"#f8fafc",marginBottom:4,letterSpacing:"-0.02em"}}>Financial Independence Forecast</h1>
+          <p style={{color:"#6b7280",fontSize:13,margin:0}}>Year-by-year projection &middot; Florida (no state tax) &middot; {a.endAge-a.currentAge} yr horizon</p>
+        </div>
 
-        const groceries = a.groceries * 12 * cumulativeInflation;
-        const utilities = a.utilities * 12 * cumulativeInflation;
-        const phoneInternet = a.phoneInternet * 12 * cumulativeInflation;
-        const transportation = a.transportation * 12 * cumulativeInflation;
-        const personalCare = a.personalCare * 12 * cumulativeInflation;
-        const clothing = a.clothing * 12 * cumulativeInflation;
-        const livingEssentials = groceries + utilities + phoneInternet + transportation + personalCare + clothing;
+        <div style={{maxWidth:1000,margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:20}}>
+          {[{l:"Starting Portfolio",v:fmt(a.startingPortfolio),c:"#6366f1"},{l:"Portfolio at "+a.endAge,v:fmt(fp),c:fp>0?"#10b981":"#ef4444"},{l:"Year 1 Discretionary",v:fmt(y0?y0.discretionary:0)+"/yr",c:"#f59e0b"},{l:"Status",v:depleted?"Depleted at "+depletionAge:"Survives to "+a.endAge,c:depleted?"#ef4444":"#10b981"},{l:"Peak W/D Rate",v:pw.toFixed(1)+"%",c:pw>5?"#ef4444":"#10b981"}].map(function(cd,i){return <div key={i} style={Object.assign({},SECTION_STYLE,{marginBottom:0,padding:"14px 16px",borderLeft:"3px solid "+cd.c})}><div style={{color:"#6b7280",fontSize:11,marginBottom:4,fontWeight:500}}>{cd.l}</div><div style={{color:cd.c,fontSize:16,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace",fontFeatureSettings:"'tnum'"}}>{cd.v}</div></div>;})}
+        </div>
 
-        const essentialSpending = healthcare + housingTotal + carAnnual + carReplacement + childCosts + collegeCosts + livingEssentials;
-        const targetSpending = a.annualSpending * cumulativeInflation;
-        const discretionary = Math.max(0, targetSpending - essentialSpending);
-        const totalWithdrawal = essentialSpending + discretionary;
+        <div style={{maxWidth:1000,margin:"0 auto"}}>
+          <div style={{display:"flex",gap:4,marginBottom:16,background:"#1a1a2e",borderRadius:10,padding:4,position:"sticky",top:0,zIndex:10}}>
+            {TABS.map(function(t,i){return <button key={t} onClick={function(){setTab(i);}} style={{flex:1,padding:"10px 8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,background:tab===i?"#6366f1":"transparent",color:tab===i?"#fff":"#6b7280",transition:"all 0.2s"}}>{t}</button>;})}
+          </div>
 
-        let income = 0;
-        if (age >= a.ssStartAge) income += a.ssMonthlyBenefit * 12 * Math.pow(1 + a.inflationRate / 100, age - a.ssStartAge);
-        if (age < a.partTimeEndAge) income += a.partTimeIncome * cumulativeInflation;
-        income += a.rentalIncome * cumulativeInflation;
-
-        const taxableWithdrawal = Math.max(0, totalWithdrawal - income);
-        const taxes = taxableWithdrawal * (a.effectiveTaxRate / 100);
+          {tab===0 && <div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Core Parameters</h3><div style={GRID(2)}>
+              <Slider label="Current Age" value={a.currentAge} onChange={set("currentAge")} min={25} max={55} step={1} />
+              <Slider label="Plan Through Age" value={a.endAge} onChange={set("endAge")} min={80} max={100} step={1} />
+              <NumberInput label="Starting Portfolio" value={a.startingPortfolio} onChange={set("startingPortfolio")} tooltip="Total invested assets (excl. home)" />
+              <NumberInput label="Annual Spending Target" value={a.annualSpending} onChange={set("annualSpending")} tooltip="Total desired spend in today's $" />
+              <Slider label="Inflation Rate" value={a.inflationRate} onChange={set("inflationRate")} min={1} max={8} step={0.1} format={pct} />
+              <Slider label="Nominal Return" value={a.nominalReturn} onChange={set("nominalReturn")} min={3} max={12} step={0.1} format={pct} tooltip="Before inflation. S&P avg ~10%" />
+              <Slider label="Cash Buffer (years)" value={a.cashBufferYears} onChange={set("cashBufferYears")} min={0} max={7} step={1} />
+              <Slider label="Effective Tax Rate" value={a.effectiveTaxRate} onChange={set("effectiveTaxRate")} min={0} max={30} step={0.5} format={pct} tooltip="FL: no state tax; federal only" />
+            </div></div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Healthcare</h3><div style={GRID(2)}>
+              <NumberInput label="Annual Premium (pre-Medicare)" value={a.healthcareBaseAnnual} onChange={set("healthcareBaseAnnual")} tooltip="Family of 4, ACA marketplace" />
+              <Slider label="Healthcare Inflation" value={a.healthcareInflation} onChange={set("healthcareInflation")} min={2} max={10} step={0.1} format={pct} />
+              <NumberInput label="Annual OOP Max" value={a.healthcareOOPMax} onChange={set("healthcareOOPMax")} />
+              <Slider label="Medicare Start Age" value={a.medicareAge} onChange={set("medicareAge")} min={62} max={70} step={1} />
+              <NumberInput label="Post-Medicare Annual Cost" value={a.medicareCostAnnual} onChange={set("medicareCostAnnual")} tooltip="Parts B+D + supplemental" />
+            </div></div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Housing & Auto</h3><div style={GRID(2)}>
+              <NumberInput label="Home Value" value={a.homeValue} onChange={set("homeValue")} tooltip="Owned outright, no mortgage" />
+              <Slider label="Property Tax Rate" value={a.propertyTaxRate} onChange={set("propertyTaxRate")} min={0.3} max={3} step={0.05} format={pct} />
+              <NumberInput label="Home Insurance" value={a.homeInsurance} onChange={set("homeInsurance")} tooltip="FL can be high (hurricanes)" />
+              <Slider label="Maintenance (% of value)" value={a.maintenanceRate} onChange={set("maintenanceRate")} min={0.5} max={3} step={0.1} format={pct} />
+              <NumberInput label="Car Value" value={a.carValue} onChange={set("carValue")} />
+              <Slider label="Replace Every N Years" value={a.carReplacementYears} onChange={set("carReplacementYears")} min={5} max={15} step={1} format={function(v){return v+" yrs";}} />
+              <NumberInput label="Annual Car Costs" value={a.carAnnualCosts} onChange={set("carAnnualCosts")} tooltip="Insurance, gas, maintenance" />
+            </div></div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Children & Education</h3><div style={GRID(2)}>
+              <Slider label="Kid 1 Current Age" value={a.kid1Age} onChange={set("kid1Age")} min={0} max={17} step={1} />
+              <Slider label="Kid 2 Current Age" value={a.kid2Age} onChange={set("kid2Age")} min={0} max={17} step={1} />
+              <NumberInput label="Annual Cost per Child" value={a.childAnnualCost} onChange={set("childAnnualCost")} tooltip="Activities, clothes, supplies" />
+              <Slider label="Independence Age" value={a.childIndependenceAge} onChange={set("childIndependenceAge")} min={18} max={26} step={1} />
+              <NumberInput label="Annual College Cost" value={a.annualCollegeCost} onChange={set("annualCollegeCost")} tooltip="Today's $, per child" />
+              <Slider label="College Inflation" value={a.collegeCostInflation} onChange={set("collegeCostInflation")} min={2} max={8} step={0.1} format={pct} />
+              <Slider label="College Start Age" value={a.collegeStartAge} onChange={set("collegeStartAge")} min={17} max={20} step={1} />
+              <Slider label="College Years" value={a.collegeYears} onChange={set("collegeYears")} min={2} max={6} step={1} />
+            </div></div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Income Streams</h3><div style={GRID(2)}>
+              <Slider label="Social Security Start Age" value={a.ssStartAge} onChange={set("ssStartAge")} min={62} max={70} step={1} />
+              <NumberInput label="SS Monthly Benefit" value={a.ssMonthlyBenefit} onChange={set("ssMonthlyBenefit")} tooltip="Check ssa.gov" />
+              <NumberInput label="Part-Time Annual Income" value={a.partTimeIncome} onChange={set("partTimeIncome")} tooltip="Consulting, freelance" />
+              <Slider label="Part-Time Until Age" value={a.partTimeEndAge} onChange={set("partTimeEndAge")} min={35} max={65} step={1} />
+              <NumberInput label="Rental / Passive Income" value={a.rentalIncome} onChange={set("rentalIncome")} tooltip="Annual, today's $" />
+            </div></div>
+            <div style={SECTION_STYLE}><h3 style={{color:"#f8fafc",fontSize:14,fontWeight:600,marginBottom:14,marginTop:0}}>Monthly Essentials</h3><p style={{color:"#6b7280",font* (a.effectiveTaxRate / 100);
         const netWithdrawal = Math.max(0, totalWithdrawal + taxes - income);
         const growth = portfolio * (a.nominalReturn / 100);
         portfolio = portfolio + growth - netWithdrawal;
